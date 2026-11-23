@@ -1,4 +1,4 @@
-package main
+package console
 
 import (
 	"context"
@@ -11,73 +11,38 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"homing-mihomo/internal/config"
 )
+
+func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
 
 func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-func handleLogin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
-		writeErr(w, http.StatusBadRequest, "请求格式错误")
-		return
-	}
-	accMu.Lock()
-	a := acct
-	accMu.Unlock()
-	if a == nil {
-		writeErr(w, http.StatusInternalServerError, "账户未初始化")
-		return
-	}
-	if req.Username != "" && req.Username != a.Username {
-		time.Sleep(250 * time.Millisecond)
-		writeErr(w, http.StatusUnauthorized, "用户名或密码错误")
-		return
-	}
-	if !verifyPassword(req.Password, a.PasswordHash) {
-		time.Sleep(250 * time.Millisecond)
-		writeErr(w, http.StatusUnauthorized, "用户名或密码错误")
-		return
-	}
-	issueSession(w)
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "username": a.Username})
+func trimSlash(s string) string {
+	return strings.Trim(s, "/")
 }
 
-func handleLogout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{Name: "homingmihomo", Value: "", Path: "/", MaxAge: -1})
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
-}
-
-func handleMe(w http.ResponseWriter, r *http.Request) {
-	accMu.Lock()
-	name := ""
-	if acct != nil {
-		name = acct.Username
-	}
-	accMu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]interface{}{"username": name})
-}
-
-func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
+// HandleStatus 处理 /api/status。
+func (a *App) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 	version := ""
 	healthy := false
-	if v, err := a.client.version(ctx); err == nil {
+	if v, err := a.client.Version(ctx); err == nil {
 		version = v
 		healthy = true
 	}
 	up, down := int64(0), int64(0)
 	conns := 0
-	if c, err := a.client.connections(ctx); err == nil {
+	if c, err := a.client.Connections(ctx); err == nil {
 		up, down = c.UploadTotal, c.DownloadTotal
 		conns = len(c.Connections)
 	}
@@ -97,11 +62,12 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 			"upload":      up,
 			"download":    down,
 		},
-		"ports": map[string]interface{}{"proxy": a.Settings().MixedPort, "admin": adminPort},
+		"ports": map[string]interface{}{"proxy": a.Settings().MixedPort, "admin": a.adminPort},
 	})
 }
 
-func (a *App) handleProfiles(w http.ResponseWriter, r *http.Request) {
+// HandleProfiles 处理 /api/profiles。
+func (a *App) HandleProfiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		list, active := a.store.List()
@@ -127,7 +93,8 @@ func (a *App) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *App) handleProfileAction(w http.ResponseWriter, r *http.Request) {
+// HandleProfileAction 处理 /api/profiles/ 下的上传、刷新、激活、更新、删除。
+func (a *App) HandleProfileAction(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, "/api/profiles/")
 	rest = trimSlash(rest)
 	if rest == "" {
@@ -264,14 +231,15 @@ type proxyGroup struct {
 	Nodes []proxyNode `json:"nodes"`
 }
 
-func (a *App) handleProxies(w http.ResponseWriter, r *http.Request) {
+// HandleProxies 处理 /api/proxies。
+func (a *App) HandleProxies(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	proxies, err := a.client.proxies(ctx)
+	proxies, err := a.client.Proxies(ctx)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
@@ -300,7 +268,8 @@ func (a *App) handleProxies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"groups": groups})
 }
 
-func (a *App) handleSelectProxy(w http.ResponseWriter, r *http.Request) {
+// HandleSelectProxy 处理 /api/proxies/select。
+func (a *App) HandleSelectProxy(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
@@ -319,14 +288,15 @@ func (a *App) handleSelectProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	if err := a.client.selectProxy(ctx, req.Group, req.Name); err != nil {
+	if err := a.client.SelectProxy(ctx, req.Group, req.Name); err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
 
-func (a *App) handleTestProxy(w http.ResponseWriter, r *http.Request) {
+// HandleTestProxy 处理 /api/proxies/test。
+func (a *App) HandleTestProxy(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
@@ -365,7 +335,7 @@ func (a *App) handleTestProxy(w http.ResponseWriter, r *http.Request) {
 			defer func() { <-sem }()
 			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 			defer cancel()
-			delay, err := a.client.delay(ctx, name, testURL, 5000)
+			delay, err := a.client.Delay(ctx, name, testURL, 5000)
 			mu.Lock()
 			if err != nil {
 				results[name] = map[string]interface{}{"delay": 0, "error": err.Error()}
@@ -379,14 +349,15 @@ func (a *App) handleTestProxy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"results": results})
 }
 
-func (a *App) handleRules(w http.ResponseWriter, r *http.Request) {
+// HandleRules 处理 /api/rules。
+func (a *App) HandleRules(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	rules, err := a.client.rules(ctx)
+	rules, err := a.client.Rules(ctx)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
@@ -394,19 +365,20 @@ func (a *App) handleRules(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"rules": rules})
 }
 
-func (a *App) handleConnections(w http.ResponseWriter, r *http.Request) {
+// HandleConnections 处理 /api/connections。
+func (a *App) HandleConnections(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 	switch r.Method {
 	case http.MethodGet:
-		c, err := a.client.connections(ctx)
+		c, err := a.client.Connections(ctx)
 		if err != nil {
 			writeErr(w, http.StatusBadGateway, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, c)
 	case http.MethodDelete:
-		if err := a.client.closeAllConnections(ctx); err != nil {
+		if err := a.client.CloseAllConnections(ctx); err != nil {
 			writeErr(w, http.StatusBadGateway, err.Error())
 			return
 		}
@@ -416,7 +388,8 @@ func (a *App) handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *App) handleConnectionAction(w http.ResponseWriter, r *http.Request) {
+// HandleConnectionAction 处理 /api/connections/<id>。
+func (a *App) HandleConnectionAction(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/api/connections/")
 	if id == "" {
 		writeErr(w, http.StatusNotFound, "not found")
@@ -428,40 +401,42 @@ func (a *App) handleConnectionAction(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	if err := a.client.closeConnection(ctx, id); err != nil {
+	if err := a.client.CloseConnection(ctx, id); err != nil {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
 
-func (a *App) handleLogs(w http.ResponseWriter, r *http.Request) {
+// HandleLogs 处理 /api/logs。
+func (a *App) HandleLogs(w http.ResponseWriter, r *http.Request) {
 	after := int64(0)
 	if v := r.URL.Query().Get("after"); v != "" {
 		_, _ = fmt.Sscanf(v, "%d", &after)
 	}
-	lines, next := a.sup.ring.Since(after)
+	lines, next := a.sup.LogsSince(after)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"lines": lines, "next": next})
 }
 
-func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
+// HandleSettings 处理 /api/settings。
+func (a *App) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]interface{}{"settings": a.Settings()})
 	case http.MethodPut:
-		var s Settings
+		var s config.Settings
 		if err := json.NewDecoder(io.LimitReader(r.Body, 2<<20)).Decode(&s); err != nil {
 			writeErr(w, http.StatusBadRequest, "请求格式错误")
 			return
 		}
-		s.DNSServers = normalizeCSV(s.DNSServers)
+		s.DNSServers = config.NormalizeCSV(s.DNSServers)
 		s.DNSListen = strings.TrimSpace(s.DNSListen)
 		s.TunDevice = strings.TrimSpace(s.TunDevice)
 		s.TunStack = strings.TrimSpace(s.TunStack)
 		s.Mode = strings.TrimSpace(s.Mode)
 		s.DNSMode = strings.TrimSpace(s.DNSMode)
 		s.ProxyAuthUser = strings.TrimSpace(s.ProxyAuthUser)
-		if err := validateSettings(s); err != nil {
+		if err := config.ValidateSettings(s, a.adminPort); err != nil {
 			writeErr(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -475,7 +450,8 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *App) handleRestart(w http.ResponseWriter, r *http.Request) {
+// HandleRestart 处理 /api/core/restart。
+func (a *App) HandleRestart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return

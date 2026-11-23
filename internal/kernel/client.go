@@ -1,4 +1,5 @@
-package main
+// Package kernel 封装 mihomo external-controller 的 HTTP 客户端与内核进程守护。
+package kernel
 
 import (
 	"bytes"
@@ -12,21 +13,23 @@ import (
 	"time"
 )
 
-type mihomoClient struct {
+// Client 是 127.0.0.1 external-controller 的 HTTP 客户端。
+type Client struct {
 	base   string
 	secret string
 	http   *http.Client
 }
 
-func newMihomoClient(secret string) *mihomoClient {
-	return &mihomoClient{
-		base:   fmt.Sprintf("http://127.0.0.1:%d", mihomoAPIPort),
+// NewClient 创建内核 API 客户端；apiPort 是 external-controller 的本地端口。
+func NewClient(apiPort int, secret string) *Client {
+	return &Client{
+		base:   fmt.Sprintf("http://127.0.0.1:%d", apiPort),
 		secret: secret,
 		http:   &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
-func (c *mihomoClient) do(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
+func (c *Client) do(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
 	var rdr io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -59,7 +62,8 @@ func (c *mihomoClient) do(ctx context.Context, method, path string, body interfa
 	return out, nil
 }
 
-func (c *mihomoClient) version(ctx context.Context) (string, error) {
+// Version 返回内核版本。
+func (c *Client) Version(ctx context.Context) (string, error) {
 	out, err := c.do(ctx, http.MethodGet, "/version", nil)
 	if err != nil {
 		return "", err
@@ -77,20 +81,22 @@ func (c *mihomoClient) version(ctx context.Context) (string, error) {
 	return v.Version, nil
 }
 
-type mihomoProxy struct {
+// Proxy 是 /proxies 返回的单个代理或策略组。
+type Proxy struct {
 	Type string   `json:"type"`
 	Now  string   `json:"now"`
 	All  []string `json:"all"`
 	UDP  bool     `json:"udp"`
 }
 
-func (c *mihomoClient) proxies(ctx context.Context) (map[string]mihomoProxy, error) {
+// Proxies 返回内核当前的代理/策略组列表。
+func (c *Client) Proxies(ctx context.Context) (map[string]Proxy, error) {
 	out, err := c.do(ctx, http.MethodGet, "/proxies", nil)
 	if err != nil {
 		return nil, err
 	}
 	var v struct {
-		Proxies map[string]mihomoProxy `json:"proxies"`
+		Proxies map[string]Proxy `json:"proxies"`
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return nil, err
@@ -98,12 +104,14 @@ func (c *mihomoClient) proxies(ctx context.Context) (map[string]mihomoProxy, err
 	return v.Proxies, nil
 }
 
-func (c *mihomoClient) selectProxy(ctx context.Context, group, name string) error {
+// SelectProxy 在策略组中选择指定节点。
+func (c *Client) SelectProxy(ctx context.Context, group, name string) error {
 	_, err := c.do(ctx, http.MethodPut, "/proxies/"+url.PathEscape(group), map[string]string{"name": name})
 	return err
 }
 
-func (c *mihomoClient) delay(ctx context.Context, name, testURL string, timeoutMS int) (int, error) {
+// Delay 对单个节点做延迟测速，返回毫秒延迟。
+func (c *Client) Delay(ctx context.Context, name, testURL string, timeoutMS int) (int, error) {
 	path := fmt.Sprintf("/proxies/%s/delay?timeout=%d&url=%s",
 		url.PathEscape(name), timeoutMS, url.QueryEscape(testURL))
 	out, err := c.do(ctx, http.MethodGet, path, nil)
@@ -122,19 +130,21 @@ func (c *mihomoClient) delay(ctx context.Context, name, testURL string, timeoutM
 	return v.Delay, nil
 }
 
-type mihomoRule struct {
+// Rule 是 /rules 返回的单条规则。
+type Rule struct {
 	Type    string `json:"type"`
 	Payload string `json:"payload"`
 	Proxy   string `json:"proxy"`
 }
 
-func (c *mihomoClient) rules(ctx context.Context) ([]mihomoRule, error) {
+// Rules 返回内核当前生效的规则列表。
+func (c *Client) Rules(ctx context.Context) ([]Rule, error) {
 	out, err := c.do(ctx, http.MethodGet, "/rules", nil)
 	if err != nil {
 		return nil, err
 	}
 	var v struct {
-		Rules []mihomoRule `json:"rules"`
+		Rules []Rule `json:"rules"`
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return nil, err
@@ -142,35 +152,40 @@ func (c *mihomoClient) rules(ctx context.Context) ([]mihomoRule, error) {
 	return v.Rules, nil
 }
 
-type mihomoConnections struct {
+// Connections 是 /connections 的响应。
+type Connections struct {
 	DownloadTotal int64                    `json:"downloadTotal"`
 	UploadTotal   int64                    `json:"uploadTotal"`
 	Connections   []map[string]interface{} `json:"connections"`
 }
 
-func (c *mihomoClient) connections(ctx context.Context) (*mihomoConnections, error) {
+// Connections 返回当前连接与累计流量。
+func (c *Client) Connections(ctx context.Context) (*Connections, error) {
 	out, err := c.do(ctx, http.MethodGet, "/connections", nil)
 	if err != nil {
 		return nil, err
 	}
-	var v mihomoConnections
+	var v Connections
 	if err := json.Unmarshal(out, &v); err != nil {
 		return nil, err
 	}
 	return &v, nil
 }
 
-func (c *mihomoClient) closeConnection(ctx context.Context, id string) error {
+// CloseConnection 关闭单条连接。
+func (c *Client) CloseConnection(ctx context.Context, id string) error {
 	_, err := c.do(ctx, http.MethodDelete, "/connections/"+url.PathEscape(id), nil)
 	return err
 }
 
-func (c *mihomoClient) closeAllConnections(ctx context.Context) error {
+// CloseAllConnections 关闭全部连接。
+func (c *Client) CloseAllConnections(ctx context.Context) error {
 	_, err := c.do(ctx, http.MethodDelete, "/connections", nil)
 	return err
 }
 
-func (c *mihomoClient) healthy(ctx context.Context) bool {
-	_, err := c.version(ctx)
+// Healthy 通过查询版本判断内核是否已就绪。
+func (c *Client) Healthy(ctx context.Context) bool {
+	_, err := c.Version(ctx)
 	return err == nil
 }

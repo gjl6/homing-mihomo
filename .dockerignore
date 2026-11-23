@@ -1,6 +1,10 @@
+# 构建上下文是仓库根目录；只保留构建镜像需要的源码、数据与依赖。
+.git/
+.github/
 data/
 .env
+deploy/.env
 *.log
-.git/
+*.exe
+scripts/
 README.md
-docker-compose.yml

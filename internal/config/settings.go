@@ -1,4 +1,5 @@
-package main
+// Package config 负责控制台设置、订阅配置渲染以及通用的文件工具。
+package config
 
 import (
 	"encoding/json"
@@ -8,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 )
+
+// MihomoAPIPort 是内核 external-controller 在本机监听的端口。
+const MihomoAPIPort = 9091
 
 // Settings 是控制台自己的覆盖项；订阅里的其它配置原样保留。
 type Settings struct {
@@ -29,7 +33,8 @@ type Settings struct {
 	OverrideYAML string `json:"overrideYaml"`
 }
 
-func defaultSettings() Settings {
+// DefaultSettings 返回控制台默认设置。
+func DefaultSettings() Settings {
 	return Settings{
 		MixedPort:    7890,
 		AllowLan:     true,
@@ -46,9 +51,10 @@ func defaultSettings() Settings {
 	}
 }
 
-func loadSettings() Settings {
-	s := defaultSettings()
-	if b, err := os.ReadFile(settingsPath); err == nil {
+// LoadSettings 读取设置文件；文件不存在或字段缺失时回退默认值。
+func LoadSettings(path string) Settings {
+	s := DefaultSettings()
+	if b, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(b, &s)
 	}
 	if s.MixedPort == 0 {
@@ -75,23 +81,25 @@ func loadSettings() Settings {
 	return s
 }
 
-func saveSettings(s Settings) error {
+// SaveSettings 原子写入设置文件。
+func SaveSettings(path string, s Settings) error {
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(settingsPath, b, 0o600)
+	return WriteFileAtomic(path, b, 0o600)
 }
 
-func validateSettings(s Settings) error {
+// ValidateSettings 校验控制台设置；adminPort 用于检查端口冲突。
+func ValidateSettings(s Settings, adminPort int) error {
 	if s.MixedPort < 1 || s.MixedPort > 65535 {
 		return fmt.Errorf("代理端口必须在 1~65535")
 	}
 	if s.MixedPort == adminPort {
 		return fmt.Errorf("代理端口不能与 Web 管理端口 %d 相同", adminPort)
 	}
-	if s.MixedPort == mihomoAPIPort {
-		return fmt.Errorf("代理端口不能与内核 API 端口 %d 相同", mihomoAPIPort)
+	if s.MixedPort == MihomoAPIPort {
+		return fmt.Errorf("代理端口不能与内核 API 端口 %d 相同", MihomoAPIPort)
 	}
 	if (s.ProxyAuthUser == "") != (s.ProxyAuthPass == "") {
 		return fmt.Errorf("代理认证用户名和密码必须同时填写或同时留空")
@@ -136,10 +144,10 @@ func validateSettings(s Settings) error {
 		if _, err := listenPort(s.DNSListen); err != nil {
 			return fmt.Errorf("DNS 监听: %w", err)
 		}
-		if len(splitCSV(s.DNSServers)) == 0 {
+		if len(SplitCSV(s.DNSServers)) == 0 {
 			return fmt.Errorf("自定义 DNS 模式需要填写 DNS 上游")
 		}
-		for _, part := range splitCSV(s.DNSServers) {
+		for _, part := range SplitCSV(s.DNSServers) {
 			if err := validateDNSServer(part); err != nil {
 				return fmt.Errorf("DNS 上游 %q: %w", part, err)
 			}
@@ -196,7 +204,8 @@ func validateDNSServer(s string) error {
 	return nil
 }
 
-func splitCSV(s string) []string {
+// SplitCSV 把逗号分隔的列表拆成去空白的字符串切片。
+func SplitCSV(s string) []string {
 	var out []string
 	for _, part := range strings.Split(s, ",") {
 		part = strings.TrimSpace(part)
@@ -207,6 +216,7 @@ func splitCSV(s string) []string {
 	return out
 }
 
-func normalizeCSV(s string) string {
-	return strings.Join(splitCSV(s), ",")
+// NormalizeCSV 规范化逗号分隔的列表。
+func NormalizeCSV(s string) string {
+	return strings.Join(SplitCSV(s), ",")
 }

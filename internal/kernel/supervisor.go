@@ -1,4 +1,4 @@
-package main
+package kernel
 
 import (
 	"context"
@@ -11,12 +11,14 @@ import (
 	"time"
 )
 
+// LogLine 是一行内核日志。
 type LogLine struct {
 	ID   int64  `json:"id"`
 	Text string `json:"text"`
 }
 
-type logRing struct {
+// LogRing 是固定容量的内核日志环形缓冲，同时实现 io.Writer。
+type LogRing struct {
 	mu      sync.Mutex
 	next    int64
 	lines   []LogLine
@@ -24,11 +26,12 @@ type logRing struct {
 	max     int
 }
 
-func newLogRing(max int) *logRing {
-	return &logRing{max: max}
+// NewLogRing 创建最多保留 max 行的日志环。
+func NewLogRing(max int) *LogRing {
+	return &LogRing{max: max}
 }
 
-func (r *logRing) Write(p []byte) (int, error) {
+func (r *LogRing) Write(p []byte) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.partial += string(p)
@@ -54,7 +57,8 @@ func (r *logRing) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (r *logRing) Since(after int64) ([]LogLine, int64) {
+// Since 返回 ID 大于 after 的日志行以及当前最大 ID。
+func (r *LogRing) Since(after int64) ([]LogLine, int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	start := 0
@@ -71,7 +75,8 @@ func (r *logRing) Since(after int64) ([]LogLine, int64) {
 	return out, r.next
 }
 
-func (r *logRing) Tail(n int) []string {
+// Tail 返回最后 n 行日志文本。
+func (r *LogRing) Tail(n int) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if n <= 0 || n > len(r.lines) {
@@ -90,6 +95,7 @@ type procState struct {
 	startedAt time.Time
 }
 
+// Supervisor 负责拉起、守护和重启 mihomo 内核进程。
 type Supervisor struct {
 	mu          sync.Mutex
 	proc        *procState
@@ -99,11 +105,12 @@ type Supervisor struct {
 	configPath  string
 	dataDir     string
 	lastExit    string
-	ring        *logRing
-	client      *mihomoClient
+	ring        *LogRing
+	client      *Client
 }
 
-func newSupervisor(bin, dataDir, configPath string, ring *logRing, client *mihomoClient) *Supervisor {
+// NewSupervisor 创建内核进程守护。
+func NewSupervisor(bin, dataDir, configPath string, ring *LogRing, client *Client) *Supervisor {
 	return &Supervisor{
 		bin:         bin,
 		configPath:  configPath,
@@ -114,6 +121,7 @@ func newSupervisor(bin, dataDir, configPath string, ring *logRing, client *mihom
 	}
 }
 
+// Start 启动内核进程（已在运行则忽略）。
 func (s *Supervisor) Start() {
 	s.mu.Lock()
 	if s.proc != nil {
@@ -160,6 +168,7 @@ func (s *Supervisor) wait(p *procState) {
 	}
 }
 
+// Stop 停止内核进程。
 func (s *Supervisor) Stop() {
 	s.mu.Lock()
 	s.stopping = true
@@ -190,17 +199,20 @@ func (s *Supervisor) Stop() {
 	s.mu.Unlock()
 }
 
+// Restart 重启内核进程。
 func (s *Supervisor) Restart() {
 	s.Stop()
 	s.Start()
 }
 
+// Running 报告内核进程是否在运行。
 func (s *Supervisor) Running() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.proc != nil
 }
 
+// Uptime 返回内核进程已运行秒数。
 func (s *Supervisor) Uptime() int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -210,17 +222,19 @@ func (s *Supervisor) Uptime() int64 {
 	return int64(time.Since(s.proc.startedAt).Seconds())
 }
 
+// LastExit 返回最近一次退出/启动失败的信息。
 func (s *Supervisor) LastExit() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.lastExit
 }
 
+// WaitHealthy 在 timeout 内轮询内核 API，直到就绪。
 func (s *Supervisor) WaitHealthy(timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		ok := s.client.healthy(ctx)
+		ok := s.client.Healthy(ctx)
 		cancel()
 		if ok {
 			return true
@@ -230,7 +244,13 @@ func (s *Supervisor) WaitHealthy(timeout time.Duration) bool {
 	return false
 }
 
+// LogTail 返回最后 n 行日志（用换行拼接）。
 func (s *Supervisor) LogTail(n int) string {
 	lines := s.ring.Tail(n)
 	return strings.Join(lines, "\n")
+}
+
+// LogsSince 返回 ID 大于 after 的日志行以及下一个游标。
+func (s *Supervisor) LogsSince(after int64) ([]LogLine, int64) {
+	return s.ring.Since(after)
 }

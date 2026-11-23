@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"strings"
@@ -22,15 +22,17 @@ rules:
   - "MATCH,DIRECT"
 `
 
+const testAdminPort = 8088
+
 func TestRenderOverridesAndPreserves(t *testing.T) {
-	s := defaultSettings()
+	s := DefaultSettings()
 	s.MixedPort = 7899
 	s.AllowLan = true
 	s.Mode = "global"
 	s.IPv6 = true
 	s.TunEnabled = false
 	s.DNSMode = "off"
-	out, err := renderConfig([]byte(testProfile), s, "test-secret")
+	out, err := RenderConfig([]byte(testProfile), s, "test-secret")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +59,7 @@ func TestRenderOverridesAndPreserves(t *testing.T) {
 }
 
 func TestRenderTunAndCustomDNS(t *testing.T) {
-	s := defaultSettings()
+	s := DefaultSettings()
 	s.TunEnabled = true
 	s.TunDevice = "homing"
 	s.TunAutoRoute = false
@@ -65,7 +67,7 @@ func TestRenderTunAndCustomDNS(t *testing.T) {
 	s.DNSListen = "0.0.0.0:1053"
 	s.DNSServers = "1.1.1.1,8.8.8.8"
 	s.FakeIP = true
-	out, err := renderConfig([]byte(testProfile), s, "s")
+	out, err := RenderConfig([]byte(testProfile), s, "s")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +89,7 @@ func TestRenderTunAndCustomDNS(t *testing.T) {
 }
 
 func TestRenderOverride(t *testing.T) {
-	s := defaultSettings()
+	s := DefaultSettings()
 	s.OverrideYAML = `
 proxies:
   - name: extra
@@ -97,7 +99,7 @@ proxies:
 rules:
   - MATCH,extra
 `
-	out, err := renderConfig([]byte(testProfile), s, "s")
+	out, err := RenderConfig([]byte(testProfile), s, "s")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,10 +114,10 @@ rules:
 }
 
 func TestRenderProxyAuthentication(t *testing.T) {
-	s := defaultSettings()
+	s := DefaultSettings()
 	s.ProxyAuthUser = "user"
 	s.ProxyAuthPass = "pass"
-	out, err := renderConfig([]byte(testProfile), s, "s")
+	out, err := RenderConfig([]byte(testProfile), s, "s")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,24 +127,24 @@ func TestRenderProxyAuthentication(t *testing.T) {
 }
 
 func TestRenderRejectsNonMapping(t *testing.T) {
-	if _, err := renderConfig([]byte("- a\n- b\n"), defaultSettings(), "s"); err == nil {
+	if _, err := RenderConfig([]byte("- a\n- b\n"), DefaultSettings(), "s"); err == nil {
 		t.Fatal("list profile should be rejected")
 	}
 }
 
 func TestValidateSettings(t *testing.T) {
-	s := defaultSettings()
-	if err := validateSettings(s); err != nil {
+	s := DefaultSettings()
+	if err := ValidateSettings(s, testAdminPort); err != nil {
 		t.Fatalf("default settings rejected: %v", err)
 	}
-	s.MixedPort = adminPort
-	if err := validateSettings(s); err == nil {
+	s.MixedPort = testAdminPort
+	if err := ValidateSettings(s, testAdminPort); err == nil {
 		t.Fatal("mixed port equal admin port should be rejected")
 	}
-	s = defaultSettings()
+	s = DefaultSettings()
 	s.DNSMode = "custom"
 	s.DNSListen = "bad"
-	if err := validateSettings(s); err == nil {
+	if err := ValidateSettings(s, testAdminPort); err == nil {
 		t.Fatal("bad dns listen should be rejected")
 	}
 }

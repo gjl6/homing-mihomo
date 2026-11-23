@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// parseProfile 只接受 YAML mapping，拒绝空文件/纯列表。
-func parseProfile(b []byte) (map[string]interface{}, error) {
+// ParseProfile 只接受 YAML mapping，拒绝空文件/纯列表。
+func ParseProfile(b []byte) (map[string]interface{}, error) {
 	var m map[string]interface{}
 	if err := yaml.Unmarshal(b, &m); err != nil {
 		return nil, fmt.Errorf("YAML 解析失败: %w", err)
@@ -48,10 +48,10 @@ func mergeMaps(dst, src map[string]interface{}) {
 	}
 }
 
-// renderConfig 把订阅配置 + 控制台覆盖项生成最终运行配置。
+// RenderConfig 把订阅配置 + 控制台覆盖项生成最终运行配置。
 // 保留订阅的 proxies / proxy-groups / rules / providers 等，只覆盖入口、API、TUN、DNS。
-func renderConfig(profile []byte, s Settings, secret string) ([]byte, error) {
-	m, err := parseProfile(profile)
+func RenderConfig(profile []byte, s Settings, secret string) ([]byte, error) {
+	m, err := ParseProfile(profile)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func renderConfig(profile []byte, s Settings, secret string) ([]byte, error) {
 	m["mode"] = s.Mode
 	m["ipv6"] = s.IPv6
 	m["log-level"] = "info"
-	m["external-controller"] = fmt.Sprintf("127.0.0.1:%d", mihomoAPIPort)
+	m["external-controller"] = fmt.Sprintf("127.0.0.1:%d", MihomoAPIPort)
 	m["secret"] = secret
 	if s.ProxyAuthUser != "" {
 		m["authentication"] = []string{s.ProxyAuthUser + ":" + s.ProxyAuthPass}
@@ -99,7 +99,7 @@ func renderConfig(profile []byte, s Settings, secret string) ([]byte, error) {
 	case "off":
 		m["dns"] = map[string]interface{}{"enable": false}
 	case "custom":
-		servers := splitCSV(s.DNSServers)
+		servers := SplitCSV(s.DNSServers)
 		dns := map[string]interface{}{
 			"enable":             true,
 			"listen":             s.DNSListen,
@@ -143,7 +143,8 @@ func renderConfig(profile []byte, s Settings, secret string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func defaultProfileYAML() []byte {
+// DefaultProfileYAML 返回内置的默认直连配置。
+func DefaultProfileYAML() []byte {
 	return []byte(`# homing-mihomo 默认直连配置
 mixed-port: 7890
 allow-lan: false

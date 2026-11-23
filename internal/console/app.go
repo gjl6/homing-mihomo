@@ -1,4 +1,5 @@
-package main
+// Package console 实现管理台的 HTTP API、登录鉴权以及配置应用流程。
+package console
 
 import (
 	"context"
@@ -9,35 +10,68 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"homing-mihomo/internal/config"
+	"homing-mihomo/internal/kernel"
+	"homing-mihomo/internal/profiles"
 )
 
-type App struct {
-	dataDir    string
-	configPath string
-	bin        string
-	sup        *Supervisor
-	client     *mihomoClient
-	store      *ProfileStore
-	applyMu    sync.Mutex
-	settingsMu sync.RWMutex
-	settings   Settings
+// Options 是 App 的构造参数。
+type Options struct {
+	DataDir      string
+	ConfigPath   string
+	SettingsPath string
+	Bin          string
+	AdminPort    int
+	Secret       string
+	Supervisor   *kernel.Supervisor
+	Client       *kernel.Client
+	Store        *profiles.Store
+	Settings     config.Settings
 }
 
-func newApp(dataDir, configPath, bin string, sup *Supervisor, client *mihomoClient, store *ProfileStore, s Settings) *App {
+// App 持有管理台运行时依赖与可变设置。
+type App struct {
+	dataDir      string
+	configPath   string
+	settingsPath string
+	bin          string
+	adminPort    int
+	secret       string
+	sup          *kernel.Supervisor
+	client       *kernel.Client
+	store        *profiles.Store
+	applyMu      sync.Mutex
+	settingsMu   sync.RWMutex
+	settings     config.Settings
+}
+
+// NewApp 装配管理台。
+func NewApp(o Options) *App {
 	return &App{
-		dataDir: dataDir, configPath: configPath, bin: bin,
-		sup: sup, client: client, store: store, settings: s,
+		dataDir:      o.DataDir,
+		configPath:   o.ConfigPath,
+		settingsPath: o.SettingsPath,
+		bin:          o.Bin,
+		adminPort:    o.AdminPort,
+		secret:       o.Secret,
+		sup:          o.Supervisor,
+		client:       o.Client,
+		store:        o.Store,
+		settings:     o.Settings,
 	}
 }
 
-func (a *App) Settings() Settings {
+// Settings 返回当前设置快照。
+func (a *App) Settings() config.Settings {
 	a.settingsMu.RLock()
 	defer a.settingsMu.RUnlock()
 	return a.settings
 }
 
-func (a *App) ApplySettings(s Settings) error {
-	if err := validateSettings(s); err != nil {
+// ApplySettings 应用并持久化新设置。
+func (a *App) ApplySettings(s config.Settings) error {
+	if err := config.ValidateSettings(s, a.adminPort); err != nil {
 		return err
 	}
 	a.applyMu.Lock()
@@ -53,7 +87,7 @@ func (a *App) ApplySettings(s Settings) error {
 	if err := a.applyConfigLocked(data, s); err != nil {
 		return err
 	}
-	if err := saveSettings(s); err != nil {
+	if err := config.SaveSettings(a.settingsPath, s); err != nil {
 		return fmt.Errorf("运行配置已生效，但保存设置失败: %w", err)
 	}
 	a.settingsMu.Lock()
@@ -62,6 +96,7 @@ func (a *App) ApplySettings(s Settings) error {
 	return nil
 }
 
+// ActivateProfile 应用指定订阅并设为当前启用。
 func (a *App) ActivateProfile(id string) error {
 	a.applyMu.Lock()
 	defer a.applyMu.Unlock()
@@ -76,6 +111,7 @@ func (a *App) ActivateProfile(id string) error {
 	return a.store.SetActive(id)
 }
 
+// RestartCore 重启内核并等待其恢复健康。
 func (a *App) RestartCore() error {
 	a.applyMu.Lock()
 	defer a.applyMu.Unlock()
@@ -86,8 +122,8 @@ func (a *App) RestartCore() error {
 	return nil
 }
 
-func (a *App) applyConfigLocked(profile []byte, s Settings) error {
-	cfg, err := renderConfig(profile, s, secret)
+func (a *App) applyConfigLocked(profile []byte, s config.Settings) error {
+	cfg, err := config.RenderConfig(profile, s, a.secret)
 	if err != nil {
 		return err
 	}
@@ -97,9 +133,9 @@ func (a *App) applyConfigLocked(profile []byte, s Settings) error {
 	old, _ := os.ReadFile(a.configPath)
 	backup := filepath.Join(a.dataDir, "backups", fmt.Sprintf("config-%d.yaml", time.Now().Unix()))
 	if len(old) > 0 {
-		_ = writeFileAtomic(backup, old, 0o600)
+		_ = config.WriteFileAtomic(backup, old, 0o600)
 	}
-	if err := writeFileAtomic(a.configPath, cfg, 0o600); err != nil {
+	if err := config.WriteFileAtomic(a.configPath, cfg, 0o600); err != nil {
 		return fmt.Errorf("写入运行配置失败: %w", err)
 	}
 	a.sup.Restart()
@@ -108,7 +144,7 @@ func (a *App) applyConfigLocked(profile []byte, s Settings) error {
 	}
 	msg := a.sup.LogTail(20)
 	if len(old) > 0 {
-		_ = writeFileAtomic(a.configPath, old, 0o600)
+		_ = config.WriteFileAtomic(a.configPath, old, 0o600)
 		a.sup.Restart()
 		a.sup.WaitHealthy(8 * time.Second)
 	}

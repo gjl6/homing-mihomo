@@ -2,17 +2,18 @@
 # 构建并推送独立镜像 homing-mihomo（多架构）
 #
 # 在仓库根目录执行；先 docker login。
-# 复用 .env 的 HOMING_IMAGE_PREFIX，例如 yourname/。
+# 复用 deploy/.env 的 HOMING_IMAGE_PREFIX，例如 yourname/。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [ ! -f .env ]; then
-  echo "未找到 .env，先复制模板：cp .env.example .env"
+ENV_FILE="deploy/.env"
+if [ ! -f "$ENV_FILE" ]; then
+  echo "未找到 deploy/.env，先复制模板：cp deploy/.env.example deploy/.env"
   exit 1
 fi
 
 read_env() {
-  grep -E "^[[:space:]]*$1=" .env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"'
+  grep -E "^[[:space:]]*$1=" "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"'
 }
 
 PREFIX="$(read_env HOMING_IMAGE_PREFIX)"
@@ -22,7 +23,7 @@ PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 PUSH_LATEST="${PUSH_LATEST:-1}"
 
 if [ -z "$PREFIX" ]; then
-  echo "请先在 .env 设置 HOMING_IMAGE_PREFIX（例如 yourname/）"
+  echo "请先在 deploy/.env 设置 HOMING_IMAGE_PREFIX（例如 yourname/）"
   exit 1
 fi
 PREFIX="${PREFIX%/}"
@@ -35,6 +36,7 @@ fi
 echo ">>> ${PREFIX}/homing-mihomo:${VERSION} (${PLATFORMS})"
 docker buildx build \
   --platform "${PLATFORMS}" \
+  -f deploy/Dockerfile \
   --build-arg "VERSION=${VERSION}" \
   "${TAGS[@]}" \
   --push \

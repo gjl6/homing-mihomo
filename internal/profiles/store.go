@@ -1,4 +1,5 @@
-package main
+// Package profiles 负责订阅（URL / 本地 YAML）的下载、保存与激活状态。
+package profiles
 
 import (
 	"context"
@@ -12,8 +13,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"homing-mihomo/internal/config"
 )
 
+// Profile 是一个订阅的元信息。
 type Profile struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -28,24 +32,26 @@ type profileState struct {
 	Profiles []Profile `json:"profiles"`
 }
 
-type ProfileStore struct {
+// Store 是订阅存储，元信息写 profiles.json，正文写 profiles/<id>.yaml。
+type Store struct {
 	mu    sync.Mutex
 	dir   string
 	path  string
 	state profileState
 }
 
-func newProfileStore(dataDir string) (*ProfileStore, error) {
+// NewStore 打开（必要时初始化）dataDir 下的订阅存储。
+func NewStore(dataDir string) (*Store, error) {
 	dir := filepath.Join(dataDir, "profiles")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	s := &ProfileStore{dir: dir, path: filepath.Join(dataDir, "profiles.json")}
+	s := &Store{dir: dir, path: filepath.Join(dataDir, "profiles.json")}
 	if b, err := os.ReadFile(s.path); err == nil {
 		_ = json.Unmarshal(b, &s.state)
 	}
 	if len(s.state.Profiles) == 0 {
-		p, err := s.addYAML("默认直连", "builtin", "", defaultProfileYAML())
+		p, err := s.addYAML("默认直连", "builtin", "", config.DefaultProfileYAML())
 		if err != nil {
 			return nil, err
 		}
@@ -61,22 +67,24 @@ func newProfileStore(dataDir string) (*ProfileStore, error) {
 	return s, nil
 }
 
-func (s *ProfileStore) save() error {
+func (s *Store) save() error {
 	b, err := json.MarshalIndent(s.state, "", "  ")
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(s.path, b, 0o600)
+	return config.WriteFileAtomic(s.path, b, 0o600)
 }
 
-func (s *ProfileStore) List() ([]Profile, string) {
+// List 返回全部订阅以及当前启用的订阅 ID。
+func (s *Store) List() ([]Profile, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := append([]Profile(nil), s.state.Profiles...)
 	return out, s.state.Active
 }
 
-func (s *ProfileStore) Get(id string) (Profile, bool) {
+// Get 按 ID 查找订阅。
+func (s *Store) Get(id string) (Profile, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range s.state.Profiles {
@@ -87,7 +95,8 @@ func (s *ProfileStore) Get(id string) (Profile, bool) {
 	return Profile{}, false
 }
 
-func (s *ProfileStore) Active() (Profile, bool) {
+// Active 返回当前启用的订阅。
+func (s *Store) Active() (Profile, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range s.state.Profiles {
@@ -98,7 +107,8 @@ func (s *ProfileStore) Active() (Profile, bool) {
 	return Profile{}, false
 }
 
-func (s *ProfileStore) Read(id string) ([]byte, error) {
+// Read 读取订阅正文。
+func (s *Store) Read(id string) ([]byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range s.state.Profiles {
@@ -109,7 +119,8 @@ func (s *ProfileStore) Read(id string) ([]byte, error) {
 	return nil, fmt.Errorf("订阅不存在")
 }
 
-func (s *ProfileStore) SetActive(id string) error {
+// SetActive 切换当前启用的订阅。
+func (s *Store) SetActive(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range s.state.Profiles {
@@ -121,30 +132,32 @@ func (s *ProfileStore) SetActive(id string) error {
 	return fmt.Errorf("订阅不存在")
 }
 
-func (s *ProfileStore) WriteRaw(id string, data []byte) error {
+// WriteRaw 原样覆盖订阅正文。
+func (s *Store) WriteRaw(id string, data []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return writeFileAtomic(filepath.Join(s.dir, id+".yaml"), data, 0o600)
+	return config.WriteFileAtomic(filepath.Join(s.dir, id+".yaml"), data, 0o600)
 }
 
-func (s *ProfileStore) AddYAML(name, kind, rawURL string, data []byte) (Profile, error) {
+// AddYAML 新增一个订阅并校验其 YAML。
+func (s *Store) AddYAML(name, kind, rawURL string, data []byte) (Profile, error) {
 	return s.addYAML(name, kind, rawURL, data)
 }
 
-func (s *ProfileStore) addYAML(name, kind, rawURL string, data []byte) (Profile, error) {
-	// 调用方可能已经持锁；newProfileStore 初始化时没有并发，单独处理。
+func (s *Store) addYAML(name, kind, rawURL string, data []byte) (Profile, error) {
+	// 调用方可能已经持锁；NewStore 初始化时没有并发，单独处理。
 	return s.addYAMLUnlocked(name, kind, rawURL, data)
 }
 
-func (s *ProfileStore) addYAMLUnlocked(name, kind, rawURL string, data []byte) (Profile, error) {
-	if _, err := parseProfile(data); err != nil {
+func (s *Store) addYAMLUnlocked(name, kind, rawURL string, data []byte) (Profile, error) {
+	if _, err := config.ParseProfile(data); err != nil {
 		return Profile{}, err
 	}
 	name = cleanProfileName(name)
 	if name == "" {
 		name = "未命名订阅"
 	}
-	id := randomHex(6)
+	id := config.RandomHex(6)
 	p := Profile{
 		ID:        id,
 		Name:      name,
@@ -153,7 +166,7 @@ func (s *ProfileStore) addYAMLUnlocked(name, kind, rawURL string, data []byte) (
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 		Size:      len(data),
 	}
-	if err := writeFileAtomic(filepath.Join(s.dir, id+".yaml"), data, 0o600); err != nil {
+	if err := config.WriteFileAtomic(filepath.Join(s.dir, id+".yaml"), data, 0o600); err != nil {
 		return Profile{}, err
 	}
 	s.mu.Lock()
@@ -166,7 +179,8 @@ func (s *ProfileStore) addYAMLUnlocked(name, kind, rawURL string, data []byte) (
 	return p, err
 }
 
-func (s *ProfileStore) AddURL(name, rawURL string) (Profile, error) {
+// AddURL 下载订阅 URL 并保存。
+func (s *Store) AddURL(name, rawURL string) (Profile, error) {
 	data, filename, err := downloadProfile(rawURL)
 	if err != nil {
 		return Profile{}, err
@@ -177,7 +191,8 @@ func (s *ProfileStore) AddURL(name, rawURL string) (Profile, error) {
 	return s.addYAML(name, "url", rawURL, data)
 }
 
-func (s *ProfileStore) Update(id string) (Profile, error) {
+// Update 重新下载 URL 订阅并更新正文与元信息。
+func (s *Store) Update(id string) (Profile, error) {
 	s.mu.Lock()
 	idx := -1
 	for i, p := range s.state.Profiles {
@@ -201,10 +216,10 @@ func (s *ProfileStore) Update(id string) (Profile, error) {
 	if err != nil {
 		return Profile{}, err
 	}
-	if _, err := parseProfile(data); err != nil {
+	if _, err := config.ParseProfile(data); err != nil {
 		return Profile{}, err
 	}
-	if err := writeFileAtomic(filepath.Join(s.dir, id+".yaml"), data, 0o600); err != nil {
+	if err := config.WriteFileAtomic(filepath.Join(s.dir, id+".yaml"), data, 0o600); err != nil {
 		return Profile{}, err
 	}
 	p.Size = len(data)
@@ -221,7 +236,8 @@ func (s *ProfileStore) Update(id string) (Profile, error) {
 	return p, err
 }
 
-func (s *ProfileStore) Delete(id string) error {
+// Delete 删除订阅（不允许删除当前启用的订阅）。
+func (s *Store) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.state.Active == id {

@@ -13,7 +13,10 @@ mihomo 内核 + 自研管理台的一体化镜像，一个容器同时提供代�
 
 ## 快速开始
 
+部署文件都在 `deploy/` 目录，容器数据落在仓库根的 `data/`：
+
 ```bash
+cd deploy
 cp .env.example .env
 vi .env                  # 至少修改 ADMIN_PASSWORD
 docker compose up -d
@@ -36,7 +39,7 @@ docker compose up -d
 ## TUN 模式
 
 默认 compose 使用 bridge 网络，只映射代理端口，所以 TUN 不可用。
-如果希望 mihomo 接管宿主机流量：
+如果希望 mihomo 接管宿主机流量，编辑 `deploy/docker-compose.yml`：
 
 ```yaml
 services:
@@ -69,8 +72,10 @@ services:
 
 ## 构建
 
+在仓库根目录构建（构建上下文是仓库根，Dockerfile 在 `deploy/` 下）：
+
 ```bash
-docker build -t homing-mihomo:1.0.0 .
+docker build -f deploy/Dockerfile -t homing-mihomo:1.0.0 .
 ```
 
 多架构：
@@ -78,11 +83,32 @@ docker build -t homing-mihomo:1.0.0 .
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
+  -f deploy/Dockerfile \
   --build-arg MIHOMO_IMAGE=metacubex/mihomo:v1.19.34 \
   -t yourname/homing-mihomo:1.0.0 --push .
 ```
 
+也可以直接用脚本：`scripts/mihomo-build.sh`（本地构建）、
+`scripts/mihomo-publish.sh`（多架构推送，读取 `deploy/.env`）。
+
 构建时会从 `metacubex/mihomo` 镜像取 `/mihomo` 静态二进制；离线环境先 `docker pull` 或预打同名 tag。
+
+## 目录结构
+
+```text
+.
+├─ cmd/homing-mihomo/   进程入口，只做装配：env、目录、secret、设置、存储、渲染、
+│                       启动内核守护与 HTTP 服务、信号处理
+├─ internal/config/     控制台设置、订阅配置渲染（YAML 覆盖/TUN/DNS）、通用文件工具
+├─ internal/kernel/     mihomo external-controller 客户端 + 内核进程守护与日志环
+├─ internal/profiles/   订阅存储：URL 下载、YAML 校验、激活状态
+├─ internal/console/    管理台 HTTP API、登录会话、配置应用/回滚
+├─ web/                 ui.html 与 go:embed 封装（前端打进二进制）
+├─ deploy/              Dockerfile、docker-compose.yml、.env.example
+├─ scripts/             镜像本地构建与多架构发布脚本
+├─ geodata/             内置 geoip.metadb / geosite.dat
+└─ vendor/              锁定依赖（构建统一用 -mod=vendor）
+```
 
 ## 与 Homing 的关系
 

@@ -1,10 +1,11 @@
 # 归途 Mihomo：mihomo 内核 + 自研管理台，单镜像单容器。
 #
-# 构建（在仓库根目录）：
-#   docker build -t homing-mihomo:1.0.0 .
+# 构建（在仓库根目录，构建上下文是仓库根）：
+#   docker build -f deploy/Dockerfile -t homing-mihomo:1.0.0 .
 #
 # 多架构：
-#   docker buildx build --platform linux/amd64,linux/arm64 -t yourname/homing-mihomo:1.0.0 .
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     -f deploy/Dockerfile -t yourname/homing-mihomo:1.0.0 .
 #
 # 可固定内核版本：
 #   --build-arg MIHOMO_IMAGE=metacubex/mihomo:v1.19.34
@@ -22,9 +23,11 @@ WORKDIR /src
 ENV CGO_ENABLED=0
 COPY go.mod go.sum ./
 COPY vendor ./vendor
-COPY *.go ui.html ./
+COPY cmd ./cmd
+COPY internal ./internal
+COPY web ./web
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -mod=vendor -trimpath -ldflags "-s -w" -o /out/homing-mihomo .
+    go build -mod=vendor -trimpath -ldflags "-s -w" -o /out/homing-mihomo ./cmd/homing-mihomo
 
 # ---------- 运行 ----------
 FROM alpine:3.20

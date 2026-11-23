@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>归途 Mihomo · 控制台</title>
+<style>
+:root{
+  --bg:#0a111d;--bg2:#0e1726;--side:#0b1422;--card:#101c2e;--card2:#132238;
+  --border:rgba(148,163,184,.14);--border2:rgba(148,163,184,.22);
+  --text:#e5eefb;--muted:#8fa3bd;--faint:#64748b;
+  --accent:#2dd4bf;--accent2:#38bdf8;--accent-soft:rgba(45,212,191,.12);
+  --ok:#34d399;--warn:#fbbf24;--bad:#fb7185;--violet:#a78bfa;
+  --shadow:0 18px 50px rgba(0,0,0,.28);--radius:16px;
+}
+[data-theme="light"]{
+  --bg:#eef3f8;--bg2:#f6f9fc;--side:#ffffff;--card:#ffffff;--card2:#f3f7fb;
+  --border:rgba(15,23,42,.10);--border2:rgba(15,23,42,.18);
+  --text:#102033;--muted:#5b7089;--faint:#8b9bb0;
+  --accent:#0d9488;--accent2:#0284c7;--accent-soft:rgba(13,148,136,.10);
+  --ok:#059669;--warn:#d97706;--bad:#e11d48;--violet:#7c3aed;
+  --shadow:0 16px 40px rgba(16,32,51,.08);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(900px 500px at 80% -10%,rgba(45,212,191,.08),transparent 60%),var(--bg);color:var(--text);font-family:"Inter","Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+button,select,input,textarea{font-family:inherit;font-size:inherit}
+button{cursor:pointer}
+a{color:inherit}
+.hidden{display:none!important}
+.mono{font-family:"JetBrains Mono","Cascadia Code",Consolas,monospace}
+.muted{color:var(--muted)}
+.faint{color:var(--faint)}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.gap{display:flex;gap:8px;flex-wrap:wrap}
+
+/* login */
+#login{min-height:100%;display:grid;place-items:center;padding:28px}
+.login-wrap{width:min(420px,100%)}
+.login-brand{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#04121b;font-weight:900;letter-spacing:-1px;box-shadow:0 10px 30px rgba(45,212,191,.25)}
+.login-brand h1{font-size:20px;margin:0;letter-spacing:.2px}
+.login-brand p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.login-card{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:26px;box-shadow:var(--shadow)}
+.login-card h2{margin:0 0 6px;font-size:18px}
+.login-card .sub{color:var(--muted);font-size:12.5px;margin-bottom:20px}
+.login-error{min-height:18px;color:var(--bad);font-size:12px;margin-top:10px}
+.foot-note{text-align:center;color:var(--faint);font-size:11.5px;margin-top:18px;line-height:1.7}
+
+/* app */
+#app{min-height:100%;display:flex}
+.side{width:226px;flex:0 0 226px;background:linear-gradient(180deg,var(--side),var(--bg2));border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 20px}
+.brand .logo{width:36px;height:36px;border-radius:11px;font-size:14px}
+.brand b{display:block;font-size:15px}
+.brand span{display:block;color:var(--faint);font-size:10.5px;margin-top:2px}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--muted);text-align:left;padding:10px 11px;border-radius:11px;font-weight:600;font-size:13px;transition:.14s}
+.nav button svg{width:17px;height:17px;opacity:.8}
+.nav button:hover{background:var(--card2);color:var(--text)}
+.nav button.active{background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(45,212,191,.14)}
+.side-foot{margin-top:auto;padding:14px 8px 0;border-top:1px solid var(--border);color:var(--faint);font-size:11px;line-height:1.7}
+.main{flex:1;min-width:0;padding:22px 26px 40px}
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.topbar h1{font-size:21px;margin:0;letter-spacing:.2px}
+.topbar .sub{color:var(--muted);font-size:12px;margin-top:3px}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.status-pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:11.5px;color:var(--muted);background:var(--card)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 3px rgba(148,163,184,.1)}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(52,211,153,.12)}
+.dot.bad{background:var(--bad);box-shadow:0 0 0 3px rgba(251,113,133,.12)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--border2);background:var(--card);color:var(--text);padding:8px 12px;border-radius:10px;font-weight:650;font-size:12.5px;transition:.14s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#03121a;box-shadow:0 8px 22px rgba(45,212,191,.18)}
+.btn.primary:hover{color:#03121a;filter:brightness(1.05)}
+.btn.ghost{background:transparent}
+.btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+.btn.sm{padding:5px 9px;font-size:11.5px;border-radius:8px}
+.btn.icon{padding:8px;width:34px;height:34px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.seg{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--border);border-radius:11px;background:var(--card2);flex-wrap:wrap}
+.seg button{border:0;background:transparent;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:11.5px;font-weight:700}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+
+/* forms */
+.input,select,textarea{width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:12.5px;outline:none;transition:.14s}
+.input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.field .help{font-size:11px;color:var(--faint);margin-top:5px;line-height:1.55}
+.inline{display:flex;gap:12px;flex-wrap:wrap}
+.inline>.field{flex:1;min-width:170px;margin-bottom:0}
+.check{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;cursor:pointer}
+.check input{width:auto;accent-color:var(--accent)}
+
+/* cards/layout */
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.card{background:linear-gradient(180deg,var(--card),var(--card));border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:0 4px 24px rgba(0,0,0,.04)}
+.card.pad0{padding:0;overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.card-head h3{margin:0;font-size:13.5px;letter-spacing:.1px}
+.card-head .hint{font-size:11.5px;color:var(--faint);margin-top:3px}
+.kpi-label{font-size:11.5px;color:var(--muted);margin-bottom:7px}
+.kpi{font-size:24px;font-weight:800;letter-spacing:-.4px}
+.kpi.small{font-size:18px}
+.kpi-sub{font-size:11.5px;color:var(--faint);margin-top:5px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;font-size:10.5px;font-weight:700;background:var(--card2);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.badge.ok{color:var(--ok);border-color:rgba(52,211,153,.24);background:rgba(52,211,153,.08)}
+.badge.warn{color:var(--warn);border-color:rgba(251,191,36,.24);background:rgba(251,191,36,.08)}
+.badge.bad{color:var(--bad);border-color:rgba(251,113,133,.24);background:rgba(251,113,133,.08)}
+.badge.accent{color:var(--accent);border-color:rgba(45,212,191,.24);background:var(--accent-soft)}
+.toolbar{display:flex;align-items:center;gap:9px;margin-bottom:14px;flex-wrap:wrap}
+.toolbar .grow{flex:1}
+.search{max-width:260px}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--faint);font-weight:750;padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--card2)}
+.empty{padding:44px 18px;text-align:center;color:var(--faint);font-size:12.5px;line-height:1.8}
+.actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+
+/* overview */
+.core-hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.core-icon{width:46px;height:46px;border-radius:14px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent)}
+.core-icon svg{width:24px;height:24px}
+.traffic-num{font-size:16px;font-weight:800}
+.progress{height:6px;border-radius:99px;background:var(--card2);overflow:hidden;margin-top:8px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px}
+.meta-list{display:grid;gap:10px}
+.meta-row{display:flex;justify-content:space-between;gap:14px;font-size:12.5px;padding:8px 0;border-bottom:1px dashed var(--border)}
+.meta-row:last-child{border-bottom:0}
+.meta-row span:first-child{color:var(--muted)}
+
+/* profiles */
+.profile{display:flex;align-items:center;gap:14px;padding:15px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.profile:last-child{border-bottom:0}
+.profile .name{font-weight:750;font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.profile .meta{font-size:11.5px;color:var(--faint);margin-top:5px;line-height:1.6;word-break:break-all}
+.profile .spacer{flex:1}
+.profile.active{background:linear-gradient(90deg,var(--accent-soft),transparent 55%)}
+
+/* proxies */
+.group{border:1px solid var(--border);border-radius:14px;background:var(--card);margin-bottom:14px;overflow:hidden}
+.group-head{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.group-head .grow{flex:1}
+.group-head .title{font-weight:750;font-size:13px;display:flex;align-items:center;gap:8px}
+.group-head select{width:auto;min-width:160px;max-width:260px}
+.nodes{padding:7px 9px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:5px}
+.node{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;cursor:pointer;border:1px solid transparent;transition:.12s}
+.node:hover{background:var(--card2);border-color:var(--border)}
+.node.now{background:var(--accent-soft);border-color:rgba(45,212,191,.2)}
+.node .nname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+.node .dly{font-size:10.5px;font-weight:800;padding:2px 6px;border-radius:6px;background:var(--card2);color:var(--faint);white-space:nowrap}
+.node .dly.ok{color:var(--ok)}.node .dly.mid{color:var(--warn)}.node .dly.bad{color:var(--bad)}
+.node .test{border:1px solid var(--border);background:transparent;color:var(--faint);border-radius:7px;padding:2px 6px;font-size:10.5px}
+
+/* logs */
+.log-box{background:#050a12;border:1px solid var(--border);border-radius:12px;padding:13px;height:calc(100vh - 230px);min-height:300px;overflow:auto;font-family:"JetBrains Mono","Cascadia Code",Consolas,monospace;font-size:11.5px;line-height:1.65;color:#9fb3c8;white-space:pre-wrap;word-break:break-all}
+[data-theme="light"] .log-box{background:#0b1220;color:#b8c7d9}
+.log-line{padding:1px 0}
+.log-line .t{color:#5f7690;margin-right:8px}
+
+/* modal/toast */
+.overlay{position:fixed;inset:0;background:rgba(3,8,16,.62);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:50;padding:20px}
+.modal{width:min(520px,100%);background:var(--card);border:1px solid var(--border2);border-radius:18px;padding:22px;box-shadow:var(--shadow)}
+.modal h3{margin:0 0 5px;font-size:16px}
+.modal .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
+.modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+#toast{position:fixed;right:20px;bottom:20px;z-index:80;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:12.5px;box-shadow:var(--shadow);max-width:360px;animation:in .18s ease-out}
+.toast.ok{border-color:rgba(52,211,153,.35)}.toast.err{border-color:rgba(251,113,133,.35)}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:860px){
+  #app{display:block}.side{width:auto;height:auto;position:static;flex-direction:row;align-items:center;padding:10px 12px;overflow-x:auto}
+  .brand{padding:0 12px 0 0;flex:0 0 auto}.brand span{display:none}.nav{flex-direction:row;gap:2px}.nav button{white-space:nowrap;padding:8px 10px}
+  .side-foot{display:none}.main{padding:16px}.grid,.grid.two,.grid.three{grid-template-columns:1fr}
+  .topbar h1{font-size:18px}.log-box{height:55vh}
+}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-wrap">
+    <div class="login-brand">
+      <div class="logo">H</div>
+      <div><h1>归途 Mihomo</h1><p>集成内核 · 自研控制台</p></div>
+    </div>
+    <div class="login-card">
+      <h2>登录控制台</h2>
+      <div class="sub">管理订阅、节点、规则和运行状态</div>
+      <div class="field"><label>用户名</label><input class="input" id="login-user" value="admin" autocomplete="username"></div>
+      <div class="field"><label>密码</label><input class="input" id="login-pass" type="password" autocomplete="current-password" placeholder="管理密码"></div>
+      <button class="btn primary" style="width:100%;padding:10px" id="login-btn" onclick="doLogin()">登录</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+    <div class="foot-note">首次启动使用 ADMIN_PASSWORD 初始化账户<br>管理台只建议暴露在局域网或内网</div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside class="side">
+    <div class="brand"><div class="logo">H</div><div><b>归途 Mihomo</b><span>Mihomo Console</span></div></div>
+    <nav class="nav" id="nav">
+      <button data-page="overview" class="active" onclick="go('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>概览</button>
+      <button data-page="profiles" onclick="go('profiles')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"/><path d="m4 12 8 4.5 8-4.5"/><path d="m4 16.5 8 4.5 8-4.5"/></svg>订阅</button>
+      <button data-page="proxies" onclick="go('proxies')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7.2 8.2l3.4 7.3M16.8 8.2l-3.4 7.3"/></svg>代理</button>
+      <button data-page="rules" onclick="go('rules')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>规则</button>
+      <button data-page="connections" onclick="go('connections')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></svg>连接</button>
+      <button data-page="logs" onclick="go('logs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 2.5 2L7 13M12 15h5"/></svg>日志</button>
+      <button data-page="settings" onclick="go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.5-.2-.1a1.7 1.7 0 0 0-2 .2l-.2.2h-4l-.2-.2a1.7 1.7 0 0 0-2-.2l-.2.1-2-3.5.1-.1a1.7 1.7 0 0 0 .3-1.9l-.1-.2.1-.2A1.7 1.7 0 0 0 4.6 13l-.1-.1v-4l.2.1a1.7 1.7 0 0 0 2-.2l.2-.2h4l.2.2a1.7 1.7 0 0 0 2 .2l.2-.1 2 3.5-.1.1a1.7 1.7 0 0 0-.3 1.9l.1.2Z"/></svg>设置</button>
+    </nav>
+    <div class="side-foot">归途 · 自托管代理控制台<br><span id="side-version">mihomo</span></div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div><h1 id="page-title">概览</h1><div class="sub" id="page-sub">内核、订阅与运行状态</div></div>
+      <div class="top-actions">
+        <span class="status-pill" id="top-status"><span class="dot" id="top-dot"></span><span id="top-status-text">连接中…</span></span>
+        <button class="btn icon" onclick="refreshCurrent()" title="刷新" aria-label="刷新"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 6.7"/><path d="M20 4v7h-7"/></svg></button>
+        <button class="btn icon" onclick="toggleTheme()" title="切换主题" aria-label="切换主题"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/></svg></button>
+        <button class="btn" onclick="logout()">退出</button>
+      </div>
+    </div>
+
+    <!-- 概览 -->
+    <section id="page-overview" class="page">
+      <div class="grid">
+        <div class="card"><div class="kpi-label">内核状态</div><div class="kpi" id="ov-core">—</div><div class="kpi-sub" id="ov-version">—</div></div>
+        <div class="card"><div class="kpi-label">当前订阅</div><div class="kpi small" id="ov-profile" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div><div class="kpi-sub" id="ov-profile-time">—</div></div>
+        <div class="card"><div class="kpi-label">运行模式</div><div class="kpi small" id="ov-mode">—</div><div class="kpi-sub" id="ov-port">代理端口 —</div></div>
+        <div class="card"><div class="kpi-label">活动连接</div><div class="kpi" id="ov-conns">0</div><div class="kpi-sub" id="ov-uptime">—</div></div>
+      </div>
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <div class="card-head"><div><h3>流量</h3><div class="hint">本次内核启动累计</div></div><span class="badge accent" id="ov-traffic-badge">实时</span></div>
+          <div class="row" style="gap:26px;flex-wrap:wrap">
+            <div><div class="kpi-label">上传</div><div class="traffic-num" id="ov-up">0 B</div></div>
+            <div><div class="kpi-label">下载</div><div class="traffic-num" id="ov-down">0 B</div></div>
+            <div><div class="kpi-label">速率</div><div class="traffic-num" id="ov-rate">—</div></div>
+          </div>
+          <div class="progress"><i id="ov-bar" style="width:0"></i></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h3>内核信息</h3><div class="hint">mihomo 运行状态</div></div><button class="btn sm" onclick="restartCore()">重启内核</button></div>
+          <div class="meta-list">
+            <div class="meta-row"><span>版本</span><b id="ov-kver">—</b></div>
+            <div class="meta-row"><span>代理端口</span><b id="ov-kport">—</b></div>
+            <div class="meta-row"><span>最近退出</span><b id="ov-kexit" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</b></div>
+            <div class="meta-row"><span>运行时长</span><b id="ov-kuptime">—</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <div class="card-head"><div><h3>快捷入口</h3><div class="hint">常用操作</div></div></div>
+          <div class="gap">
+            <button class="btn" onclick="go('profiles')">管理订阅</button>
+            <button class="btn" onclick="go('proxies')">选择节点</button>
+            <button class="btn" onclick="go('connections')">查看连接</button>
+            <button class="btn" onclick="go('logs')">实时日志</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h3>使用提示</h3><div class="hint">TUN 默认关闭</div></div><span class="badge neutral">代理端口模式</span></div>
+          <div class="muted" style="font-size:12px;line-height:1.8">默认只开放 mixed 代理端口，不修改宿主机路由。需要接管本机流量时，在「设置」里开启 TUN；容器必须使用 host 网络并具备 NET_ADMIN 与 /dev/net/tun。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 订阅 -->
+    <section id="page-profiles" class="page hidden">
+      <div class="toolbar">
+        <div class="grow muted" style="font-size:12px">订阅 YAML 会保存到 /data/profiles；启用前会先通过 mihomo -t 校验。</div>
+        <button class="btn" onclick="requestProfileRefresh()">全部更新</button>
+        <button class="btn" onclick="openModal('modal-profile')">添加订阅</button>
+        <label class="btn">上传 YAML<input type="file" id="profile-file" accept=".yaml,.yml,text/yaml" style="display:none" onchange="uploadProfile(this)"></label>
+      </div>
+      <div class="card pad0" id="profile-list"><div class="empty">加载中…</div></div>
+    </section>
+
+    <!-- 代理 -->
+    <section id="page-proxies" class="page hidden">
+      <div class="toolbar">
+        <input class="input search" id="proxy-search" placeholder="搜索策略组或节点" oninput="renderProxies()">
+        <div class="grow"></div>
+        <button class="btn" onclick="testAllProxies()" id="proxy-test-all">测试全部节点</button>
+        <button class="btn icon" onclick="loadProxies()" title="刷新代理"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 6.7"/><path d="M20 4v7h-7"/></svg></button>
+      </div>
+      <div id="proxy-groups"><div class="empty">加载中…</div></div>
+    </section>
+
+    <!-- 规则 -->
+    <section id="page-rules" class="page hidden">
+      <div class="toolbar">
+        <input class="input search" id="rules-search" placeholder="搜索类型 / 内容 / 策略" oninput="renderRules()">
+        <div class="grow"></div><span class="badge neutral" id="rules-count">0 条</span>
+        <button class="btn icon" onclick="loadRules()" title="刷新规则"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 6.7"/><path d="M20 4v7h-7"/></svg></button>
+      </div>
+      <div class="card pad0 table-wrap">
+        <table><thead><tr><th>类型</th><th>内容</th><th>策略</th></tr></thead><tbody id="rules-body"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- 连接 -->
+    <section id="page-connections" class="page hidden">
+      <div class="grid three" style="margin-bottom:14px">
+        <div class="card"><div class="kpi-label">活动连接</div><div class="kpi" id="conns-count">0</div></div>
+        <div class="card"><div class="kpi-label">累计上传</div><div class="kpi small" id="conns-up">0 B</div></div>
+        <div class="card"><div class="kpi-label">累计下载</div><div class="kpi small" id="conns-down">0 B</div></div>
+      </div>
+      <div class="toolbar">
+        <input class="input search" id="conns-search" placeholder="搜索主机 / 规则 / 链路" oninput="renderConnections()">
+        <div class="grow"></div>
+        <button class="btn danger" onclick="closeAllConnections()">关闭全部</button>
+        <button class="btn icon" onclick="loadConnections()" title="刷新连接"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 6.7"/><path d="M20 4v7h-7"/></svg></button>
+      </div>
+      <div class="card pad0 table-wrap">
+        <table><thead><tr><th>主机</th><th>网络</th><th>规则</th><th>链路</th><th>流量</th><th>操作</th></tr></thead><tbody id="conns-body"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- 日志 -->
+    <section id="page-logs" class="page hidden">
+      <div class="toolbar">
+        <label class="check"><input type="checkbox" id="log-follow" checked onchange="toggleLogFollow()">自动滚动</label>
+        <div class="grow"></div>
+        <button class="btn sm" onclick="clearLogView()">清空视图</button>
+      </div>
+      <div class="log-box" id="log-box"></div>
+    </section>
+
+    <!-- 设置 -->
+    <section id="page-settings" class="page hidden">
+      <div class="grid two">
+        <div class="card">
+          <div class="card-head"><div><h3>代理入口</h3><div class="hint">mixed HTTP/SOCKS5</div></div></div>
+          <div class="inline">
+            <div class="field"><label>代理端口</label><input class="input" id="set-mixed" type="number" min="1" max="65535"><div class="help">修改后需同步 compose 端口映射，或使用 host 网络</div></div>
+            <div class="field"><label>运行模式</label><select id="set-mode"><option value="rule">规则</option><option value="global">全局</option><option value="direct">直连</option></select></div>
+          </div>
+          <div style="margin-top:12px"><label class="check"><input type="checkbox" id="set-allowlan">允许局域网连接（远程代理需要）</label></div>
+          <div style="margin-top:10px"><label class="check"><input type="checkbox" id="set-ipv6">启用 IPv6</label></div>
+          <div class="inline" style="margin-top:14px">
+            <div class="field"><label>代理认证用户名（可选）</label><input class="input" id="set-auth-user" autocomplete="off"></div>
+            <div class="field"><label>代理认证密码（可选）</label><input class="input" id="set-auth-pass" type="password" autocomplete="new-password"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h3>TUN</h3><div class="hint">默认关闭，只开代理端口</div></div><span class="badge neutral" id="tun-badge">关闭</span></div>
+          <label class="check" style="margin-bottom:12px"><input type="checkbox" id="set-tun" onchange="renderTunFields()">启用 TUN</label>
+          <div class="inline">
+            <div class="field"><label>设备名</label><input class="input" id="set-tun-device" placeholder="mihomo"></div>
+            <div class="field"><label>协议栈</label><select id="set-tun-stack"><option value="gvisor">gvisor</option><option value="system">system</option><option value="mixed">mixed</option><option value="mips">mips</option></select></div>
+          </div>
+          <label class="check" style="margin-top:12px"><input type="checkbox" id="set-tun-auto">自动路由（auto-route）</label>
+          <div class="help" style="font-size:11px;color:var(--faint);margin-top:8px;line-height:1.6">开启 TUN 需要容器使用 host 网络，并添加 NET_ADMIN 和 /dev/net/tun。</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-head"><div><h3>DNS</h3><div class="hint">默认跟随订阅配置</div></div></div>
+        <div class="inline">
+          <div class="field"><label>DNS 模式</label><select id="set-dns-mode" onchange="renderDnsFields()"><option value="follow">跟随订阅</option><option value="custom">自定义</option><option value="off">关闭</option></select></div>
+          <div class="field"><label>监听地址</label><input class="input" id="set-dns-listen" placeholder="0.0.0.0:1053"></div>
+        </div>
+        <div class="inline" style="margin-top:12px">
+          <div class="field"><label>上游 DNS</label><input class="input" id="set-dns-servers" placeholder="223.5.5.5,119.29.29.29"></div>
+          <div class="field" style="display:flex;align-items:flex-end"><label class="check" style="margin-bottom:9px"><input type="checkbox" id="set-fakeip">fake-ip 模式</label></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-head"><div><h3>配置覆写</h3><div class="hint">深度合并到订阅配置之上，可补充节点/策略组/规则</div></div><span class="badge neutral">高级</span></div>
+        <textarea class="input mono" id="set-override" rows="9" spellcheck="false" placeholder="# 例如：&#10;# proxy-groups:&#10;#   - name: MY-GROUP&#10;#     type: select&#10;#     proxies: [DIRECT]&#10;# rules:&#10;#   - DOMAIN-SUFFIX,example.com,DIRECT"></textarea>
+        <div class="help" style="font-size:11px;color:var(--faint);margin-top:7px;line-height:1.6">列表会整体替换；入口端口、API、TUN、DNS 等控制台字段仍以页面设置为准。</div>
+      </div>
+      <div class="toolbar" style="margin-top:16px">
+        <button class="btn primary" onclick="saveSettings()">保存并应用</button>
+        <button class="btn" onclick="restartCore()">重启内核</button>
+        <span class="muted" style="font-size:12px" id="settings-state"></span>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="overlay hidden" id="modal-profile">
+  <div class="modal">
+    <h3>添加订阅</h3>
+    <div class="sub">支持 Clash / Mihomo YAML 订阅链接</div>
+    <div class="field"><label>名称（可选）</label><input class="input" id="prof-name" placeholder="如 机场 A"></div>
+    <div class="field"><label>订阅 URL</label><input class="input" id="prof-url" placeholder="https://example.com/sub?token=..."></div>
+    <div class="foot"><button class="btn" onclick="closeModal('modal-profile')">取消</button><button class="btn primary" onclick="addProfileURL()">导入</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const S = {
+  page:'overview', status:null, settings:null, profiles:[], active:'', groups:[], delays:{},
+  rules:[], connections:null, logAfter:0, logLines:[], logTimer:null, statusTimer:null, lastUp:0, lastDown:0, lastT:0
+};
+const PAGE = {
+  overview:['概览','内核、订阅与运行状态'],
+  profiles:['订阅','订阅导入、更新与启用'],
+  proxies:['代理','策略组与节点选择'],
+  rules:['规则','当前生效的路由规则'],
+  connections:['连接','活动连接与累计流量'],
+  logs:['日志','mihomo 实时输出'],
+  settings:['设置','代理入口、TUN 与 DNS']
+};
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function fmtBytes(n){n=Number(n)||0;if(n<1024)return n+' B';const u=['KB','MB','GB','TB'];let i=-1;do{n/=1024;i++}while(n>=1024&&i<u.length-1);return n.toFixed(n>=100?0:1)+' '+u[i];}
+function fmtDur(s){s=Math.max(0,Number(s)||0);if(s<60)return s+' 秒';if(s<3600)return Math.floor(s/60)+' 分 '+(s%60)+' 秒';return Math.floor(s/3600)+' 小时 '+Math.floor((s%3600)/60)+' 分';}
+function fmtTime(t){if(!t)return '—';const d=new Date(t);if(isNaN(d.getTime()))return '—';return d.toLocaleString('zh-CN',{hour12:false});}
+function pct(v){return Math.max(0,Math.min(100,Number(v)||0))+'%';}
+function toast(msg,kind=''){const el=document.createElement('div');el.className='toast '+kind;el.textContent=msg;$('toast').appendChild(el);setTimeout(()=>el.remove(),3200);}
+
+async function api(path, opts={}){
+  const headers = Object.assign({}, opts.headers||{});
+  if (!(opts.body instanceof FormData)) headers['Content-Type']='application/json';
+  const r = await fetch(path, Object.assign({credentials:'same-origin'}, opts, {headers}));
+  if (r.status===401){ showLogin(); throw new Error('未登录'); }
+  let data = {};
+  try { data = await r.json(); } catch(e){}
+  if (!r.ok) throw new Error(data.error || ('HTTP '+r.status));
+  return data;
+}
+
+function showLogin(){
+  $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+  if (S.statusTimer){clearInterval(S.statusTimer);S.statusTimer=null;}
+  if (S.logTimer){clearInterval(S.logTimer);S.logTimer=null;}
+}
+function showApp(){ $('login').classList.add('hidden'); $('app').classList.remove('hidden'); }
+
+async function doLogin(){
+  const btn=$('login-btn'); btn.disabled=true; $('login-error').textContent='';
+  try{
+    await api('/api/login',{method:'POST',body:JSON.stringify({username:$('login-user').value.trim(),password:$('login-pass').value})});
+    $('login-pass').value=''; await enterApp();
+  }catch(e){ $('login-error').textContent=e.message; }
+  finally{ btn.disabled=false; }
+}
+$('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+async function logout(){ try{await api('/api/logout',{method:'POST'});}catch(e){} showLogin(); }
+
+async function enterApp(){
+  showApp();
+  const hash=(location.hash||'#overview').slice(1);
+  go(PAGE[hash]?hash:'overview');
+  await Promise.all([refreshStatus(),loadProfiles(),loadSettings()]);
+  if (S.statusTimer) clearInterval(S.statusTimer);
+  S.statusTimer=setInterval(refreshStatus,4000);
+}
+
+function go(page){
+  if(!PAGE[page])page='overview';
+  S.page=page; location.hash=page;
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('hidden',p.id!=='page-'+page));
+  $('page-title').textContent=PAGE[page][0]; $('page-sub').textContent=PAGE[page][1];
+  if(page==='profiles')loadProfiles();
+  if(page==='proxies')loadProxies();
+  if(page==='rules')loadRules();
+  if(page==='connections')loadConnections();
+  if(page==='logs')startLogs();
+  if(page==='settings')loadSettings();
+  if(page!=='logs')stopLogs();
+}
+function refreshCurrent(){
+  refreshStatus();
+  if(S.page==='profiles')loadProfiles();
+  if(S.page==='proxies')loadProxies();
+  if(S.page==='rules')loadRules();
+  if(S.page==='connections')loadConnections();
+  if(S.page==='settings')loadSettings();
+}
+
+async function refreshStatus(){
+  try{
+    const r=await api('/api/status');
+    S.status=r;
+    const c=r.core||{}, p=r.profile||{}, t=r.traffic||{}, s=r.settings||{};
+    const ok=!!c.healthy;
+    $('top-dot').className='dot '+(ok?'ok':'bad');
+    $('top-status-text').textContent=ok?'内核正常':(c.running?'内核异常':'内核未运行');
+    $('ov-core').textContent=ok?'运行中':(c.running?'异常':'已停止');
+    $('ov-version').textContent=(c.version? 'mihomo '+c.version : '—')+(c.uptime? ' · '+fmtDur(c.uptime):'');
+    $('ov-profile').textContent=p.name||'—';
+    $('ov-profile-time').textContent=p.updatedAt?'更新于 '+fmtTime(p.updatedAt):'—';
+    $('ov-mode').textContent={rule:'规则模式',global:'全局模式',direct:'直连模式'}[s.mode]||s.mode||'—';
+    $('ov-port').textContent='代理端口 '+(s.mixedPort||'—');
+    $('ov-conns').textContent=t.connections??0;
+    $('ov-uptime').textContent=c.uptime?'已运行 '+fmtDur(c.uptime):'—';
+    $('ov-up').textContent=fmtBytes(t.upload); $('ov-down').textContent=fmtBytes(t.download);
+    $('ov-kver').textContent=c.version||'—'; $('ov-kport').textContent=s.mixedPort||'—';
+    $('ov-kexit').textContent=c.lastExit||'—'; $('ov-kuptime').textContent=c.uptime?fmtDur(c.uptime):'—';
+    $('side-version').textContent='mihomo '+(c.version||'');
+    const total=(Number(t.upload)||0)+(Number(t.download)||0);
+    const now=Date.now();
+    if(S.lastT && now>S.lastT){const rate=((Number(t.upload)+Number(t.download))-(S.lastUp+S.lastDown))/((now-S.lastT)/1000);$('ov-rate').textContent=fmtBytes(rate)+'/s';}
+    S.lastUp=Number(t.upload)||0; S.lastDown=Number(t.download)||0; S.lastT=now;
+    $('ov-bar').style.width=total>0?pct(Math.log10(total+1)/Math.log10(1024**4)*100):'0%';
+    S.settings=s;
+  }catch(e){ if(e.message!=='未登录'){ $('top-dot').className='dot bad'; $('top-status-text').textContent='连接失败'; } }
+}
+
+/* ---------- 订阅 ---------- */
+async function loadProfiles(){
+  try{
+    const r=await api('/api/profiles'); S.profiles=r.profiles||[]; S.active=r.active||''; renderProfiles();
+  }catch(e){ $('profile-list').innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
+}
+function renderProfiles(){
+  const list=S.profiles;
+  if(!list.length){$('profile-list').innerHTML='<div class="empty">还没有订阅</div>';return;}
+  $('profile-list').innerHTML=list.map(p=>{
+    const active=p.id===S.active;
+    const kind=p.kind==='url'?'订阅链接':p.kind==='builtin'?'内置':'本地 YAML';
+    return '<div class="profile '+(active?'active':'')+'">'+
+      '<div class="grow"><div class="name">'+esc(p.name)+' '+(active?'<span class="badge ok">当前启用</span>':'')+'</div>'+
+      '<div class="meta">'+esc(kind)+(p.url?' · '+esc(p.url):'')+' · '+fmtBytes(p.size)+' · 更新于 '+fmtTime(p.updatedAt)+'</div></div>'+
+      '<div class="actions">'+
+        (active?'':'<button class="btn sm primary" data-action="activate" data-id="'+esc(p.id)+'">启用</button>')+
+        (p.kind==='url'?'<button class="btn sm" data-action="update" data-id="'+esc(p.id)+'">更新</button>':'')+
+        (active?'':'<button class="btn sm danger" data-action="delete" data-id="'+esc(p.id)+'">删除</button>')+
+      '</div></div>';
+  }).join('');
+  document.querySelectorAll('#profile-list [data-action]').forEach(b=>b.onclick=()=>profileAction(b.dataset.action,b.dataset.id));
+}
+async function profileAction(action,id){
+  try{
+    if(action==='activate'){ await api('/api/profiles/'+encodeURIComponent(id)+'/activate',{method:'POST'}); toast('已切换订阅','ok'); }
+    if(action==='update'){ await api('/api/profiles/'+encodeURIComponent(id)+'/update',{method:'POST'}); toast('订阅已更新','ok'); }
+    if(action==='delete'){ if(!confirm('确认删除这个订阅？'))return; await api('/api/profiles/'+encodeURIComponent(id),{method:'DELETE'}); toast('已删除','ok'); }
+    await loadProfiles(); await refreshStatus();
+  }catch(e){ toast(e.message,'err'); }
+}
+function openModal(id){ $(id).classList.remove('hidden'); }
+function closeModal(id){ $(id).classList.add('hidden'); }
+async function addProfileURL(){
+  const name=$('prof-name').value.trim(), url=$('prof-url').value.trim();
+  if(!url){ toast('请填写订阅 URL','err'); return; }
+  try{
+    const r=await api('/api/profiles',{method:'POST',body:JSON.stringify({name,url})});
+    closeModal('modal-profile'); $('prof-name').value=''; $('prof-url').value='';
+    toast('订阅已导入：'+r.profile.name,'ok'); await loadProfiles();
+  }catch(e){ toast(e.message,'err'); }
+}
+async function uploadProfile(input){
+  const f=input.files&&input.files[0]; if(!f)return;
+  const fd=new FormData(); fd.append('file',f); fd.append('name',f.name.replace(/\.(yaml|yml)$/i,''));
+  try{ const r=await api('/api/profiles/upload',{method:'POST',body:fd}); toast('已导入：'+r.profile.name,'ok'); await loadProfiles(); }
+  catch(e){ toast(e.message,'err'); }
+  input.value='';
+}
+async function requestProfileRefresh(){
+  try{ const r=await api('/api/profiles/refresh',{method:'POST'}); if(r.errors&&r.errors.length)toast(r.errors.join('；'),'err'); else toast('全部订阅已更新','ok'); await loadProfiles(); await refreshStatus(); }
+  catch(e){ toast(e.message,'err'); }
+}
+
+/* ---------- 代理 ---------- */
+async function loadProxies(){
+  try{ const r=await api('/api/proxies'); S.groups=r.groups||[]; renderProxies(); }
+  catch(e){ $('proxy-groups').innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>'; }
+}
+function delayClass(d){ if(!d)return ''; if(d<200)return 'ok'; if(d<600)return 'mid'; return 'bad'; }
+function renderProxies(){
+  const q=($('proxy-search')?.value||'').toLowerCase();
+  const groups=S.groups.map(g=>({...g,nodes:(g.nodes||[]).filter(n=>!q||g.name.toLowerCase().includes(q)||n.name.toLowerCase().includes(q))})).filter(g=>g.nodes.length||!q);
+  if(!groups.length){$('proxy-groups').innerHTML='<div class="empty">没有匹配的策略组</div>';return;}
+  $('proxy-groups').innerHTML=groups.map(g=>{
+    const opts=(g.nodes||[]).map(n=>'<option value="'+esc(n.name)+'" '+(n.name===g.now?'selected':'')+'>'+esc(n.name)+'</option>').join('');
+    const nodes=(g.nodes||[]).map(n=>{
+      const d=S.delays[n.name]||0; const cls=delayClass(d);
+      return '<div class="node '+(n.name===g.now?'now':'')+'" data-group="'+esc(g.name)+'" data-node="'+esc(n.name)+'">'+
+        '<span class="nname" title="'+esc(n.name)+'">'+esc(n.name)+'</span>'+
+        '<span class="badge neutral">'+esc(n.type||'')+'</span>'+
+        '<span class="dly '+cls+'">'+(d?d+'ms':'—')+'</span>'+
+        '<button class="test" data-test="'+esc(n.name)+'">测速</button></div>';
+    }).join('');
+    return '<div class="group"><div class="group-head"><div class="grow"><div class="title">'+esc(g.name)+' <span class="badge neutral">'+esc(g.type)+'</span></div></div>'+
+      '<select data-group-select="'+esc(g.name)+'">'+opts+'</select></div><div class="nodes">'+nodes+'</div></div>';
+  }).join('');
+  document.querySelectorAll('[data-group-select]').forEach(sel=>sel.onchange=()=>selectProxy(sel.dataset.groupSelect,sel.value));
+  document.querySelectorAll('.node').forEach(el=>el.onclick=ev=>{ if(ev.target.dataset.test)return; selectProxy(el.dataset.group,el.dataset.node); });
+  document.querySelectorAll('[data-test]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();testNodes([b.dataset.test]);});
+}
+async function selectProxy(group,name){
+  try{ await api('/api/proxies/select',{method:'POST',body:JSON.stringify({group,name})}); toast('已切换到 '+name,'ok'); await loadProxies(); }
+  catch(e){ toast(e.message,'err'); }
+}
+async function testNodes(names){
+  if(!names.length)return;
+  try{
+    const r=await api('/api/proxies/test',{method:'POST',body:JSON.stringify({names})});
+    for(const [n,v] of Object.entries(r.results||{})) S.delays[n]=v.delay||0;
+    renderProxies();
+  }catch(e){ toast(e.message,'err'); }
+}
+async function testAllProxies(){
+  const names=[...new Set(S.groups.flatMap(g=>(g.nodes||[]).map(n=>n.name)))];
+  if(!names.length){toast('没有可测试的节点','err');return;}
+  $('proxy-test-all').disabled=true; $('proxy-test-all').textContent='测速中…';
+  await testNodes(names);
+  $('proxy-test-all').disabled=false; $('proxy-test-all').textContent='测试全部节点';
+}
+
+/* ---------- 规则 ---------- */
+async function loadRules(){
+  try{ const r=await api('/api/rules'); S.rules=r.rules||[]; renderRules(); }
+  catch(e){ $('rules-body').innerHTML='<tr><td colspan="3" class="empty">加载失败：'+esc(e.message)+'</td></tr>'; }
+}
+function renderRules(){
+  const q=($('rules-search')?.value||'').toLowerCase();
+  const list=S.rules.filter(r=>!q||[r.type,r.payload,r.proxy].some(v=>String(v||'').toLowerCase().includes(q)));
+  $('rules-count').textContent=list.length+' 条';
+  if(!list.length){$('rules-body').innerHTML='<tr><td colspan="3" class="empty">没有规则</td></tr>';return;}
+  $('rules-body').innerHTML=list.map(r=>'<tr><td><span class="badge neutral">'+esc(r.type)+'</span></td><td class="mono" style="max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.payload)+'</td><td>'+esc(r.proxy)+'</td></tr>').join('');
+}
+
+/* ---------- 连接 ---------- */
+async function loadConnections(){
+  try{ const r=await api('/api/connections'); S.connections=r; renderConnections(); }
+  catch(e){ $('conns-body').innerHTML='<tr><td colspan="6" class="empty">加载失败：'+esc(e.message)+'</td></tr>'; }
+}
+function renderConnections(){
+  const c=S.connections||{}; const list=c.connections||[];
+  $('conns-count').textContent=list.length; $('conns-up').textContent=fmtBytes(c.uploadTotal); $('conns-down').textContent=fmtBytes(c.downloadTotal);
+  const q=($('conns-search')?.value||'').toLowerCase();
+  const filtered=list.filter(x=>{const m=x.metadata||{};return !q||[m.host,m.destinationIP,m.network,(x.chains||[]).join(' '),x.rule].some(v=>String(v||'').toLowerCase().includes(q));});
+  if(!filtered.length){$('conns-body').innerHTML='<tr><td colspan="6" class="empty">没有活动连接</td></tr>';return;}
+  $('conns-body').innerHTML=filtered.slice(0,300).map(x=>{
+    const m=x.metadata||{}; const host=m.host||m.destinationIP||'—';
+    const dest=(m.destinationIP?m.destinationIP+':'+(m.destinationPort||''):'');
+    const chains=(x.chains||[]).join(' → ')||'—';
+    return '<tr><td><div style="font-weight:650">'+esc(host)+'</div><div class="faint mono" style="font-size:11px">'+esc(dest)+'</div></td>'+
+      '<td>'+esc(m.network||'—')+'</td><td>'+esc(x.rule||'—')+(x.rulePayload?' <span class="faint">'+esc(x.rulePayload)+'</span>':'')+'</td>'+
+      '<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(chains)+'">'+esc(chains)+'</td>'+
+      '<td>'+fmtBytes(x.upload)+' / '+fmtBytes(x.download)+'</td>'+
+      '<td class="actions"><button class="btn sm danger" data-close="'+esc(x.id)+'">关闭</button></td></tr>';
+  }).join('');
+  document.querySelectorAll('#conns-body [data-close]').forEach(b=>b.onclick=()=>closeConnection(b.dataset.close));
+}
+async function closeConnection(id){ try{ await api('/api/connections/'+encodeURIComponent(id),{method:'DELETE'}); await loadConnections(); }catch(e){ toast(e.message,'err'); } }
+async function closeAllConnections(){ if(!confirm('关闭全部活动连接？'))return; try{ await api('/api/connections',{method:'DELETE'}); toast('已关闭','ok'); await loadConnections(); }catch(e){ toast(e.message,'err'); } }
+
+/* ---------- 日志 ---------- */
+function startLogs(){
+  if(S.logTimer)return;
+  loadLogs(true);
+  S.logTimer=setInterval(()=>loadLogs(false),1500);
+}
+function stopLogs(){ if(S.logTimer){clearInterval(S.logTimer);S.logTimer=null;} }
+async function loadLogs(reset){
+  try{
+    const r=await api('/api/logs?after='+(reset?0:S.logAfter));
+    if(reset){S.logLines=[];S.logAfter=0;S.logViewed=0;}
+    for(const l of (r.lines||[])){S.logLines.push(l);}
+    S.logAfter=r.next||S.logAfter;
+    if(S.logLines.length>1000)S.logLines=S.logLines.slice(-1000);
+    renderLogs();
+  }catch(e){}
+}
+function renderLogs(){
+  const box=$('log-box'); if(!box)return;
+  const wasBottom=box.scrollTop+box.clientHeight>=box.scrollHeight-40;
+  box.textContent=S.logLines.map(l=>l.text).join('\n');
+  if($('log-follow')?.checked && wasBottom)box.scrollTop=box.scrollHeight;
+}
+function clearLogView(){S.logLines=[];renderLogs();}
+function toggleLogFollow(){ if($('log-follow').checked){const b=$('log-box');b.scrollTop=b.scrollHeight;} }
+
+/* ---------- 设置 ---------- */
+async function loadSettings(){
+  try{
+    const r=await api('/api/settings'); S.settings=r.settings||{}; renderSettings();
+  }catch(e){}
+}
+function renderSettings(){
+  const s=S.settings||{};
+  if(!$('set-mixed'))return;
+  $('set-mixed').value=s.mixedPort||7890; $('set-allowlan').checked=!!s.allowLan; $('set-ipv6').checked=!!s.ipv6;
+  $('set-auth-user').value=s.proxyAuthUser||''; $('set-auth-pass').value=s.proxyAuthPass||'';
+  $('set-mode').value=s.mode||'rule';
+  $('set-tun').checked=!!s.tunEnabled; $('set-tun-device').value=s.tunDevice||'mihomo'; $('set-tun-stack').value=s.tunStack||'gvisor'; $('set-tun-auto').checked=s.tunAutoRoute!==false;
+  $('set-dns-mode').value=s.dnsMode||'follow'; $('set-dns-listen').value=s.dnsListen||'0.0.0.0:1053'; $('set-dns-servers').value=s.dnsServers||'223.5.5.5,119.29.29.29'; $('set-fakeip').checked=s.fakeIp!==false;
+  $('set-override').value=s.overrideYaml||'';
+  renderTunFields(); renderDnsFields();
+}
+function renderTunFields(){
+  const on=$('set-tun')?.checked;
+  $('tun-badge').textContent=on?'开启':'关闭'; $('tun-badge').className='badge '+(on?'warn':'neutral');
+  ['set-tun-device','set-tun-stack','set-tun-auto'].forEach(id=>{const el=$(id);if(el)el.disabled=!on;});
+}
+function renderDnsFields(){
+  const m=$('set-dns-mode')?.value||'follow';
+  const dis=m!=='custom';
+  ['set-dns-listen','set-dns-servers','set-fakeip'].forEach(id=>{const el=$(id);if(el)el.disabled=dis;});
+}
+async function saveSettings(){
+  const body={
+    mixedPort:parseInt($('set-mixed').value,10)||0,
+    allowLan:$('set-allowlan').checked, proxyAuthUser:$('set-auth-user').value.trim(), proxyAuthPass:$('set-auth-pass').value,
+    mode:$('set-mode').value, ipv6:$('set-ipv6').checked,
+    tunEnabled:$('set-tun').checked, tunDevice:$('set-tun-device').value.trim(), tunStack:$('set-tun-stack').value, tunAutoRoute:$('set-tun-auto').checked,
+    dnsMode:$('set-dns-mode').value, dnsListen:$('set-dns-listen').value.trim(), dnsServers:$('set-dns-servers').value.trim(), fakeIp:$('set-fakeip').checked,
+    overrideYaml:$('set-override').value
+  };
+  $('settings-state').textContent='正在校验并应用…';
+  try{ const r=await api('/api/settings',{method:'PUT',body:JSON.stringify(body)}); S.settings=r.settings; renderSettings(); $('settings-state').textContent='已生效'; toast('设置已应用','ok'); await refreshStatus(); }
+  catch(e){ $('settings-state').textContent=''; toast('应用失败：'+e.message,'err'); }
+}
+async function restartCore(){
+  if(!confirm('确认重启 mihomo 内核？现有连接会短暂中断。'))return;
+  try{ await api('/api/core/restart',{method:'POST'}); toast('内核已重启','ok'); await refreshStatus(); }
+  catch(e){ toast('重启失败：'+e.message,'err'); }
+}
+
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';
+  document.documentElement.setAttribute('data-theme',cur); localStorage.setItem('hmtheme',cur);
+}
+const savedTheme=localStorage.getItem('hmtheme'); if(savedTheme)document.documentElement.setAttribute('data-theme',savedTheme);
+
+(async()=>{
+  try{ await api('/api/me'); await enterApp(); }
+  catch(e){ showLogin(); }
+})();
+</script>
+</body>
+</html>

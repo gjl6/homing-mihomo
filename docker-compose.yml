@@ -1,0 +1,44 @@
+# 归途 Mihomo 控制台（独立镜像）
+#
+# 默认只开代理端口，不启用 TUN：
+#   管理台  http://<host>:8088
+#   代理    <host>:7890  (mixed HTTP/SOCKS5)
+#
+# 启动：
+#   cp .env.example .env   # 修改 ADMIN_PASSWORD
+#   docker compose up -d
+#
+# 需要使用 TUN 时，取消下面 host 网络 / cap_add / devices 的注释，并删除 ports；
+# TUN 与端口映射不能同时使用（host 网络下代理端口直接监听在宿主机）。
+
+services:
+  homing-mihomo:
+    image: ${HOMING_MIHOMO_IMAGE:-homing-mihomo:1.0.0}
+    build:
+      context: .
+      args:
+        VERSION: ${HOMING_MIHOMO_VERSION:-1.0.0}
+    container_name: homing-mihomo
+    restart: unless-stopped
+    ports:
+      - "${MIHOMO_UI_PORT:-8088}:8088"
+      - "${MIHOMO_PROXY_PORT:-7890}:7890"
+    volumes:
+      - ./data:/data
+    environment:
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?请在 .env 设置 ADMIN_PASSWORD}"
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_LISTEN: ":8088"
+      DATA_DIR: "/data"
+    # ---- TUN 模式（可选）----
+    # network_mode: host
+    # cap_add:
+    #   - NET_ADMIN
+    # devices:
+    #   - /dev/net/tun:/dev/net/tun
+    stop_grace_period: 8s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

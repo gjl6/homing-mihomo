@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.metadb binary
+*.dat binary
+*.mmdb binary
+*.gz binary
+*.zip binary
+
+*.bat text eol=crlf
